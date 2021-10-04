@@ -1,5 +1,5 @@
 //*****************************************************************************
-//                HC_SR04_ESP32CAM_MQTT V1.0
+//                HC_SR04_ESP32CAM_MQTT V2.0
 //
 //    Programa que envía el valor de distancia medido a un dashboard utilizando
 //  un sensor HC-SR04. La medición la envía un ESP32CAM a un broker por medio
@@ -12,12 +12,24 @@
 //.............................................................................
 //    Octubre 10 de 2021
 //.............................................................................
-/
+//
+//    Se utiiza la librería HCSR04.h
+//    Pines para el sensor 12 y 13
+//    Se crea una variable de tipo foltante "float distancia"
+//    Para enviar la medición de distancia se crea un nuevo tópico "esp32/data_d
+//
 //******************************************************************************
 
 
-
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
+
+#include <HCSR04.h>
+
+UltraSonicDistanceSensor distanceSensor(12, 13);  // Pines para el sensor 12 y 13
+
+float distancia = 0;
+
+
 /*
  * Conexión básica por MQTT del NodeMCU
  * por: Hugo Escalpelo
@@ -45,18 +57,15 @@ const char* password = "************";  // Aquí debes poner la contraseña de t
 const char* mqtt_server = "3.121.120.155"; // Si estas en una red local, coloca la IP asignada, en caso contrario, coloca la IP publica
 IPAddress server(3,121,120,155);
 
-
 // Objetos
 WiFiClient espClient; // Este objeto maneja los datos de conexion WiFi
 PubSubClient client(espClient); // Este objeto maneja los datos de conexion al broker
-
-
 
 // Variables
 int flashLedPin = 4;  // Para indicar el estatus de conexión
 int statusLedPin = 33; // Para ser controlado por MQTT
 long timeNow, timeLast; // Variables de control de tiempo no bloqueante
-int data = 0; // Contador
+float data = 0; // Contador
 int wait = 5000;  // Indica la espera cada 5 segundos para envío de mensajes MQTT
 
 // Inicialización del programa
@@ -101,13 +110,19 @@ void setup() {
   // Conexión con el broker MQTT
   client.setServer(server, 1883); // Conectarse a la IP del broker en el puerto indicado
   client.setCallback(callback); // Activar función de CallBack, permite recibir mensajes MQTT y ejecutar funciones a partir de ellos
-  delay(1500);  // Esta espera es preventiva, espera a la conexión para no perder información
+  //delay(1523);  // Esta espera es preventiva, espera a la conexión para no perder información
+  delay(323);  // Esta espera es preventiva, espera a la conexión para no perder información
 
-  timeLast = millis (); // Inicia el control de tiempo
+
+  
 }// fin del void setup ()
 
 // Cuerpo del programa, bucle principal
 void loop() {
+
+  distancia = distanceSensor.measureDistanceCm();  //Medición de distancia
+
+  
   //Verificar siempre que haya conexión al broker
   if (!client.connected()) {
     reconnect();  // En caso de que no haya conexión, ejecutar la función de reconexión, definida despues del void setup ()
@@ -118,12 +133,16 @@ void loop() {
   if (timeNow - timeLast > wait) { // Manda un mensaje por MQTT cada cinco segundos
     timeLast = timeNow; // Actualización de seguimiento de tiempo
 
-    data++; // Incremento a la variable para ser enviado por MQTT
+
     char dataString[8]; // Define una arreglo de caracteres para enviarlos por MQTT, especifica la longitud del mensaje en 8 caracteres
-    dtostrf(data, 1, 2, dataString);  // Esta es una función nativa de leguaje AVR que convierte un arreglo de caracteres en una variable String
-    Serial.print("Contador: "); // Se imprime en monitor solo para poder visualizar que el evento sucede
-    Serial.println(dataString);
-    client.publish("esp32/data", dataString); // Esta es la función que envía los datos por MQTT, especifica el tema y el valor
+
+    // Se crea un nuevo tópico "esp32/data_d
+    data = distancia;
+    dtostrf(data, 1, 2, dataString);
+    client.publish("esp32/data_d", dataString ); // Esta es la función que envía los datos por MQTT, especifica el tema y el valor
+
+ 
+    
   }// fin del if (timeNow - timeLast > wait)
 }// fin del void loop ()
 
@@ -179,8 +198,8 @@ void reconnect() {
       Serial.print(client.state()); // Muestra el codigo de error
       Serial.println(" Volviendo a intentar en 5 segundos");
       // Espera de 5 segundos bloqueante
-      delay(5000);
+      delay(493);
       Serial.println (client.connected ()); // Muestra estatus de conexión
     }// fin del else
   }// fin del bucle while (!client.connected())
-}// fin de void reconnect(
+}// fin de void reconnect()
