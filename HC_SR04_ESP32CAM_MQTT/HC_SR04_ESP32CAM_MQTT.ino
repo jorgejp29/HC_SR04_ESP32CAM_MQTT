@@ -7,6 +7,11 @@
 //    Esta nueva versión, cambia la IP del broker que cambió (nueva IP 3,122,36,163)
 //    Este programa se modifica el 4 de Oct del 2021
 //
+//    Versión modificada por:
+//        Jorge Mguel Jaimes Ponce
+//        Etstudiante del Diplomado de CodigoIoT
+//
+//
 //    El programa base es proporcionado por:
 //        Prof: Hugo Escalpelo
 //              Diplomado IoT
