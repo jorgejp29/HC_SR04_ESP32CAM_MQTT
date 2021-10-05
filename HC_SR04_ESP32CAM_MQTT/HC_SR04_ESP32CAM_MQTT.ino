@@ -1,22 +1,26 @@
 //*****************************************************************************
-//                HC_SR04_ESP32CAM_MQTT V2.0
+//                HC_SR04_ESP32CAM_MQTT V2.2
 //
 //    Programa que envía el valor de distancia medido a un dashboard utilizando
 //  un sensor HC-SR04. La medición la envía un ESP32CAM a un broker por medio
 //  de protocolo MQTT a un broker
+//    Esta nueva versión, cambia la IP del broker que cambió (nueva IP 3,122,36,163)
+//    Este programa se modifica el 4 de Oct del 2021
 //
 //    El programa base es proporcionado por:
 //        Prof: Hugo Escalpelo
 //              Diplomado IoT
 //
 //.............................................................................
-//    Octubre 10 de 2021
+//    Octubre 4 de 2021
 //.............................................................................
 //
 //    Se utiiza la librería HCSR04.h
 //    Pines para el sensor 12 y 13
 //    Se crea una variable de tipo foltante "float distancia"
-//    Para enviar la medición de distancia se crea un nuevo tópico "esp32/data_d
+//    Para enviar la medición de distancia se crean nuevos tópicos
+//    Topico que envía valor de distancia -> codigoiot/distancia/jjaimes
+//    Topico que recibe valor del Led -> codigoiot/foco/jjaimes
 //
 //******************************************************************************
 
@@ -25,10 +29,14 @@
 
 #include <HCSR04.h>
 
-UltraSonicDistanceSensor distanceSensor(12, 13);  // Pines para el sensor 12 y 13
+UltraSonicDistanceSensor distanceSensor(12, 13);  // Initialize sensor that uses digital pins 12 (Trig) and 13 (Echo)
 
 float distancia = 0;
 
+
+unsigned long t_0 = 0;
+unsigned long t_1 = 0;
+byte  medir = 0;
 
 /*
  * Conexión básica por MQTT del NodeMCU
@@ -54,8 +62,8 @@ const char* ssid = "*********";  // Aquí debes poner el nombre de tu red
 const char* password = "************";  // Aquí debes poner la contraseña de tu red
 
 //Datos del broker MQTT
-const char* mqtt_server = "3.121.120.155"; // Si estas en una red local, coloca la IP asignada, en caso contrario, coloca la IP publica
-IPAddress server(3,121,120,155);
+const char* mqtt_server = "3.122.36.163"; // Si estas en una red local, coloca la IP asignada, en caso contrario, coloca la IP publica
+IPAddress server(3,122,36,163);
 
 // Objetos
 WiFiClient espClient; // Este objeto maneja los datos de conexion WiFi
@@ -105,7 +113,7 @@ void setup() {
   
   delay (1000); // Esta espera es solo una formalidad antes de iniciar la comunicación con el broker
 
-  Serial.end();
+  //Serial.end();
 
   // Conexión con el broker MQTT
   client.setServer(server, 1883); // Conectarse a la IP del broker en el puerto indicado
@@ -113,14 +121,31 @@ void setup() {
   //delay(1523);  // Esta espera es preventiva, espera a la conexión para no perder información
   delay(323);  // Esta espera es preventiva, espera a la conexión para no perder información
 
+  timeLast = millis (); // Inicia el control de tiempo
 
+  t_0 = millis();
   
 }// fin del void setup ()
 
 // Cuerpo del programa, bucle principal
 void loop() {
 
-  distancia = distanceSensor.measureDistanceCm();  //Medición de distancia
+  
+// Sección de programa que genera un tiempo de espera para la medición. Utiiza función millis()
+    t_1 = millis();
+    
+    if(t_1 - t_0 >= 1000){
+      t_0 = t_1; 
+      medir = 1;       
+    }
+    
+    if(medir == 1){
+       distancia = distanceSensor.measureDistanceCm();
+       Serial.print(distancia);
+       Serial.println("   cm   ");
+       delay(2000);
+       medir = 0;
+    }
 
   
   //Verificar siempre que haya conexión al broker
@@ -136,12 +161,9 @@ void loop() {
 
     char dataString[8]; // Define una arreglo de caracteres para enviarlos por MQTT, especifica la longitud del mensaje en 8 caracteres
 
-    // Se crea un nuevo tópico "esp32/data_d
     data = distancia;
     dtostrf(data, 1, 2, dataString);
-    client.publish("esp32/data_d", dataString ); // Esta es la función que envía los datos por MQTT, especifica el tema y el valor
-
- 
+    client.publish("codigoiot/distancia/jjaimes", dataString ); // Esta es la función que envía los datos por MQTT, especifica el tema y el valor
     
   }// fin del if (timeNow - timeLast > wait)
 }// fin del void loop ()
@@ -171,16 +193,16 @@ void callback(char* topic, byte* message, unsigned int length) {
 
   // Ejemplo, en caso de recibir el mensaje true - false, se cambiará el estado del led soldado en la placa.
   // El ESP323CAM está suscrito al tema esp/output
-  if (String(topic) == "esp32/output") {  // En caso de recibirse mensaje en el tema esp32/output
+  if (String(topic) == "codigoiot/foco/jjaimes") {  // En caso de recibirse mensaje en el tema esp32/output
     if(messageTemp == "true"){
       Serial.println("Led encendido");
       digitalWrite(flashLedPin, HIGH);
-    }// fin del if (String(topic) == "esp32/output")
+    }// fin del if (String(topic) == "codigoiot/foco/jjaimes")
     else if(messageTemp == "false"){
       Serial.println("Led apagado");
       digitalWrite(flashLedPin, LOW);
     }// fin del else if(messageTemp == "false")
-  }// fin del if (String(topic) == "esp32/output")
+  }// fin del if (String(topic) == "codigoiot/foco/jjaimes")
 }// fin del void callback
 
 // Función para reconectarse
@@ -191,7 +213,7 @@ void reconnect() {
     // Intentar reconexión
     if (client.connect("ESP32CAMClient")) { //Pregunta por el resultado del intento de conexión
       Serial.println("Conectado");
-      client.subscribe("esp32/output"); // Esta función realiza la suscripción al tema
+      client.subscribe("codigoiot/foco/jjaimes"); // Esta función realiza la suscripción al tema
     }// fin del  if (client.connect("ESP32CAMClient"))
     else {  //en caso de que la conexión no se logre
       Serial.print("Conexion fallida, Error rc=");
